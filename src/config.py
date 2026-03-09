@@ -111,6 +111,7 @@ class Config:
 
     # Anthropic Claude API（备选，当 Gemini 不可用时使用）
     anthropic_api_key: Optional[str] = None
+    anthropic_base_url: Optional[str] = None  # 如: https://api.anthropic.com
     anthropic_model: str = "claude-3-5-sonnet-20241022"  # Claude model name
     anthropic_temperature: float = 0.7  # Anthropic temperature (0.0-1.0, default 0.7)
     anthropic_max_tokens: int = 8192  # Max tokens for Anthropic responses
@@ -503,6 +504,7 @@ class Config:
                     'https://aihubmix.com/v1' if os.getenv('AIHUBMIX_KEY') else None
                 ),
                 deepseek_api_keys,
+                anthropic_base_url=os.getenv('ANTHROPIC_BASE_URL') or None,
             )
 
         # Auto-infer LITELLM_MODEL from channels when not explicitly set
@@ -569,6 +571,7 @@ class Config:
             gemini_max_retries=int(os.getenv('GEMINI_MAX_RETRIES', '5')),
             gemini_retry_delay=float(os.getenv('GEMINI_RETRY_DELAY', '5.0')),
             anthropic_api_key=os.getenv('ANTHROPIC_API_KEY'),
+            anthropic_base_url=os.getenv('ANTHROPIC_BASE_URL') or None,
             anthropic_model=os.getenv('ANTHROPIC_MODEL', 'claude-3-5-sonnet-20241022'),
             anthropic_temperature=float(os.getenv('ANTHROPIC_TEMPERATURE', '0.7')),
             anthropic_max_tokens=int(os.getenv('ANTHROPIC_MAX_TOKENS', '8192')),
@@ -855,6 +858,7 @@ class Config:
         openai_keys: List[str],
         openai_base_url: Optional[str],
         deepseek_keys: Optional[List[str]] = None,
+        anthropic_base_url: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Build Router model_list from legacy per-provider keys (backward compat).
 
@@ -876,22 +880,25 @@ class Config:
         # Anthropic keys
         for k in anthropic_keys:
             if k and len(k) >= 8:
+                params: Dict[str, Any] = {'model': '__legacy_anthropic__', 'api_key': k}
+                if anthropic_base_url:
+                    params['api_base'] = anthropic_base_url
                 model_list.append({
                     'model_name': '__legacy_anthropic__',
-                    'litellm_params': {'model': '__legacy_anthropic__', 'api_key': k},
+                    'litellm_params': params,
                 })
 
         # OpenAI-compatible keys
         for k in openai_keys:
             if k and len(k) >= 8:
-                params: Dict[str, Any] = {'model': '__legacy_openai__', 'api_key': k}
+                oai_params: Dict[str, Any] = {'model': '__legacy_openai__', 'api_key': k}
                 if openai_base_url:
-                    params['api_base'] = openai_base_url
+                    oai_params['api_base'] = openai_base_url
                 if openai_base_url and 'aihubmix.com' in openai_base_url:
-                    params['extra_headers'] = {'APP-Code': 'GPIJ3886'}
+                    oai_params['extra_headers'] = {'APP-Code': 'GPIJ3886'}
                 model_list.append({
                     'model_name': '__legacy_openai__',
-                    'litellm_params': params,
+                    'litellm_params': oai_params,
                 })
 
         # DeepSeek keys (native litellm provider — auto-resolves api_base)
@@ -1235,6 +1242,10 @@ def extra_litellm_params(model: str, config: Config) -> Dict[str, Any]:
     params: Dict[str, Any] = {}
     # deepseek/ provider: litellm auto-resolves api_base, no manual override needed
     if model.startswith("deepseek/"):
+        return params
+    if model.startswith("anthropic/"):
+        if config.anthropic_base_url:
+            params["api_base"] = config.anthropic_base_url
         return params
     if model.startswith("openai/") or "/" not in model:
         if config.openai_base_url:
