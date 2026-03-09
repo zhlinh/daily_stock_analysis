@@ -111,7 +111,7 @@ class Config:
 
     # Anthropic Claude API（备选，当 Gemini 不可用时使用）
     anthropic_api_key: Optional[str] = None
-    anthropic_base_url: Optional[str] = None  # 如: https://api.anthropic.com
+    anthropic_base_url: Optional[str] = None  # 如: https://api.anthropic.com，此URL将作为 LiteLLM anthropic/ 模型提供商的 api_base 传入
     anthropic_model: str = "claude-3-5-sonnet-20241022"  # Claude model name
     anthropic_temperature: float = 0.7  # Anthropic temperature (0.0-1.0, default 0.7)
     anthropic_max_tokens: int = 8192  # Max tokens for Anthropic responses
