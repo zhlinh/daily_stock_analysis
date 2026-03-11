@@ -18,7 +18,7 @@ from typing import List, Optional, Tuple
 
 import litellm
 
-from src.config import Config, get_config
+from src.config import Config, get_config, extra_litellm_params
 
 logger = logging.getLogger(__name__)
 
@@ -180,12 +180,8 @@ def _call_litellm_vision(image_b64: str, mime_type: str) -> str:
         "api_key": api_key,
         "timeout": VISION_API_TIMEOUT,
     }
-    # Add api_base and custom headers for OpenAI-compatible providers
-    if not model.startswith("gemini/") and not model.startswith("anthropic/") and not model.startswith("vertex_ai/"):
-        if cfg.openai_base_url:
-            call_kwargs["api_base"] = cfg.openai_base_url
-        if cfg.openai_base_url and "aihubmix.com" in cfg.openai_base_url:
-            call_kwargs["extra_headers"] = {"APP-Code": "GPIJ3886"}
+    # Add api_base and custom headers via unified helper
+    call_kwargs.update(extra_litellm_params(model, cfg))
 
     response = litellm.completion(**call_kwargs)
     if response and response.choices and response.choices[0].message.content:
